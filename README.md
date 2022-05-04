@@ -1,12 +1,12 @@
-#LiveGit
+# LiveGit
 
-##What is it?
+## What is it?
 
 Did you ever wish your working copy was live? You have a solution that pulls from git, but constantly committing and pushing your code is slowing you down?
 
-##Use cases
+## Use cases
 
-#####Jenkins DSL script development
+##### Jenkins DSL script development
 
 * Start LiveGit, change your job to pull from your Livegit git repo.
 * Install Jenkins Control plugin in intellij (https://plugins.jetbrains.com/plugin/6110-jenkins-control)
@@ -15,16 +15,16 @@ Did you ever wish your working copy was live? You have a solution that pulls fro
 * Double click your job to build.
 
 
-#####Anything else?
+##### Anything else?
 
-###Installation
+### Installation
 ```
 git clone url
 pip install -r requirements.txt
 ```
 Todo: packaging
 
-###Help
+### Help
 ```
 usage: livegit.py [-h] [--path PATH] [--port PORT]
 
