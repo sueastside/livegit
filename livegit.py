@@ -1,15 +1,16 @@
 import os, sys
 import glob
-import fnmatch
 import shutil
 import subprocess
 import functools
 import argparse
 import socket
+import uuid
 from threading import Thread
 import asyncio
-from pathlib import Path
+from pathlib import Path, PurePosixPath
 from time import sleep, time
+from http import HTTPStatus
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from watchfiles import awatch, Change, DefaultFilter
 import pathspec
@@ -148,6 +149,22 @@ def initialize(directory, ignore_files):
     return staging_directory, bare_directory
 
 
+class GitHTTPRequestHandler(SimpleHTTPRequestHandler):
+    def __init__(self, *args, directory=None, base= '/', **kwargs):
+        self.base = base
+        super().__init__(*args, directory=directory, **kwargs)
+        
+    def translate_path(self, path):
+        if self.base is None:
+            return super().translate_path(path)
+        
+        if not path.startswith(self.base):
+            return str(uuid.uuid4())
+
+        base_path = '/'+str(PurePosixPath(path).relative_to(self.base))
+        return super().translate_path(base_path)
+
+
 if __name__ == '__main__':
     parser = argparse.ArgumentParser()
     parser.add_argument('--path', help='The path to watch', default='.')
@@ -163,15 +180,16 @@ if __name__ == '__main__':
         
         staging_directory, bare_directory = initialize(directory, ignore_files)
 
-        hostname = socket. gethostname()
-        local_ip = socket. gethostbyname(hostname)
+        hostname = socket.gethostname()
+        local_ip = socket.gethostbyname(hostname)
+        url_path = '/user/module/'
         print('-'*40)
-        print(f'Server listening on http://{local_ip}:{args.port} ...')
+        print(f'Server listening on http://{local_ip}:{args.port}{url_path} ...')
         print()
-        print(f'You can now do "git clone http://{local_ip}:{args.port}"" ')
+        print(f'You can now do "git clone http://{local_ip}:{args.port}{url_path}"" ')
         print('-'*40)
 
-        Handler = functools.partial(SimpleHTTPRequestHandler, directory=str(bare_directory))
+        Handler = functools.partial(GitHTTPRequestHandler, directory=str(bare_directory), base=url_path)
         httpd = ThreadingHTTPServer(('', args.port), Handler)
 
         stop_event = asyncio.Event()
