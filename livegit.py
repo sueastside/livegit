@@ -12,6 +12,7 @@ from pathlib import Path
 from time import sleep, time
 from http.server import SimpleHTTPRequestHandler, ThreadingHTTPServer
 from watchfiles import awatch, Change, DefaultFilter
+import pathspec
 
 import tempfile
 from typing import Callable
@@ -57,18 +58,19 @@ class TemporaryDirectory(tempfile.TemporaryDirectory):
 
 
 class WebFilter(DefaultFilter):
-    def __init__(self, ignore_files):
+    def __init__(self, ignore_files, path_to_watch):
         self.ignore_files = ignore_files
+        self.path_to_watch = path_to_watch
         super().__init__()
 
     def __call__(self, change: Change, path: str) -> bool:
         return (
             super().__call__(change, path) and
-            not any([fnmatch.filter(path, ignore) for ignore in self.ignore_files])
+            not self.ignore_files.match_file(os.path.relpath(path, self.path_to_watch))
         )
 
 async def watch_directory(stop_event, path_to_watch: Path, ignore_files, staging_directory: Path, bare_directory: Path):
-    async for changes in awatch(path_to_watch, debug=False, step=500, watch_filter=WebFilter(ignore_files), stop_event=stop_event):
+    async for changes in awatch(path_to_watch, debug=False, step=500, watch_filter=WebFilter(ignore_files, path_to_watch), stop_event=stop_event):
         for change in changes:
             type, file = change
             print('change', type, file)
@@ -110,7 +112,7 @@ def get_ignores(path_to_watch: Path):
         with open(path_to_watch / '.gitignore') as f:
             for line in f.readlines():
                 ignore_files.append(line.strip())
-    return ignore_files
+    return pathspec.PathSpec.from_lines('gitwildmatch', ignore_files)
 
 
 def initialize(directory, ignore_files):
@@ -122,7 +124,7 @@ def initialize(directory, ignore_files):
     # Copy current state
     print('ignores', ignore_files)
     for file in glob.iglob(str(path_to_watch)+'/**', recursive=True):
-        if not any([fnmatch.filter(file, ignore) for ignore in ignore_files]) and os.path.isfile(path_to_watch / file):
+        if not ignore_files.match_file(os.path.relpath(file, path_to_watch)) and os.path.isfile(path_to_watch / file):
             destination = (staging_directory / Path(file).relative_to(path_to_watch)).parent
             print(f'Copying {file} to {destination}')
             destination.mkdir(parents=True, exist_ok=True)
@@ -158,7 +160,7 @@ if __name__ == '__main__':
         print('created temporary directory', directory)
 
         ignore_files = get_ignores(path_to_watch)
-
+        
         staging_directory, bare_directory = initialize(directory, ignore_files)
 
         hostname = socket. gethostname()
